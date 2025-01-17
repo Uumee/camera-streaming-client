@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スマホ - WebRTC</title>
+</head>
+
+<body style="padding:0;margin:0">
+    <div id="localVideoContainer" style="display:none;padding:0;margin:0">
+        <video style="width:100%;height:100%;border:0px solid red;padding:0;margin:0" id="localVideo" autoplay playsinline muted></video>
+    </div>
+    <div id="remoteVideoContainer" style="display:none;padding:0;margin:0">
+        <video style="width:100%;height:100%;border:0px solid blue;padding:0;margin:0" id="remoteVideo" autoplay playsinline muted></video>
+    </div>
+    <div><button id="offer">offer</button></div>
+    <script>
+        const signalingServerUrl = "ws://localhost:3000"; // サーバーのIPを指定
+        const signalingSocket = new WebSocket(signalingServerUrl);
+        const peerConnection = new RTCPeerConnection({});
+        const dataChannel = peerConnection.createDataChannel("channel");
+
+        signalingSocket.onmessage = async (message) => {
+            console.log('メッセージを受信:', message);
+            const data = await message.data.text().then(JSON.parse);
+            console.log('パースされたデータ:', data);
+            switch (data.type) {
+                case 'offer': {
+                    console.log('オファーを受信:', data);
+                    document.getElementById("remoteVideoContainer").style.display = "block";
+                    document.getElementById("offer").remove();
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data))
+                    const answer = await peerConnection.createAnswer();
+                    console.log('アンサーを作成:', answer);
+                    await peerConnection.setLocalDescription(answer);
+                    console.log('ローカルディスクリプションを設定');
+                    signalingSocket.send(JSON.stringify(peerConnection.localDescription));
+                    console.log('アンサーを送信:', peerConnection.localDescription);
+                    break;
+                }
+                case 'answer': {
+                    console.log('リモートディスクリプションを設定:');
+                    document.getElementById("localVideoContainer").style.display = "block";
+                    document.getElementById("offer").remove();
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                    break;
+                }
+                case 'candidate': {
+                    try {
+                        const candidate = new RTCIceCandidate(data.ice);
+                        console.log('ICE候補を受信しました', candidate);
+                        peerConnection.addIceCandidate(candidate);
+                    } catch (error) {
+                        console.error('ICE候補の追加中にエラーが発生しました:', error);
+                    }
+                    break;
+                }
+            }
+        };
+
+        peerConnection.ontrack = (event) => {
+            const videoElm = document.getElementById("remoteVideo")
+            console.log('トラックを受信:', event, videoElm);
+            videoElm.srcObject = event.streams[0];
+            try {
+                videoElm.play();
+            } catch (erro) {
+                console.log('error auto play:' + error);
+            }
+        };
+
+        signalingSocket.onopen = () => {
+            console.log('シグナリングソケットがオープン');
+            initIceCandidateForPeerConnection(peerConnection);
+            initTrackByUserMedia(peerConnection);
+        };
+
+        function initIceCandidateForPeerConnection(pc) {
+            console.log('ICE候補イベントの初期化')
+            pc.onicecandidate = (event) => {
+                console.log("ICE候補イベント:", event);
+                if (event.candidate) {
+                    const message = JSON.stringify({ type: 'candidate', ice: event.candidate });
+                    console.log('ICE候補を送信', message);
+                    signalingSocket.send(message);
+                }
+            };
+        }
+
+        async function initTrackByUserMedia(pc) {
+            console.log('カメラストリームを取得してストリームを初期化');
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            document.getElementById("localVideo").srcObject = stream;
+            stream.getTracks().forEach((track) => {
+                console.log('トラックを追加:', track, stream);
+                pc.addTrack(track, stream);
+            });
+        }
+
+        document.getElementById("offer").onclick = async () => {
+            document.getElementById("offer").disabled = true;
+            const offer = await peerConnection.createOffer();
+            console.log('オファーを作成:', offer);
+            await peerConnection.setLocalDescription(offer);
+            console.log('ローカルディスクリプションを設定');
+            signalingSocket.send(JSON.stringify(peerConnection.localDescription));
+            console.log('オファーを送信:', peerConnection.localDescription);
+        }
+
+    </script>
+</body>
+
+</html>
