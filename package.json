@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "server": "http-server"
+    "server": "http-server",
+    "server-ssl": "http-server -c-1 . --ssl --key ./localhost+2-key.pem --cert ./localhost+2.pem"
   },
   "keywords": [],
   "author": "",
