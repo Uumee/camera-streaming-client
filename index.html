@@ -4,22 +4,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>スマホ - WebRTC</title>
+    <title>WebRTC</title>
 </head>
 
 <body style="padding:0;margin:0">
+    <div><button id="loacal-btn">local</button><button id="remote-btn">remote</button><button id="offer">offer</button></div>
     <div id="localVideoContainer" style="display:none;padding:0;margin:0">
-        <video style="width:100%;height:100%;border:0px solid red;padding:0;margin:0" id="localVideo" autoplay playsinline muted></video>
+        <video style="width:100%;height:100%;border:1px solid red;padding:0;margin:0" id="localVideo" autoplay
+            playsinline muted></video>
     </div>
     <div id="remoteVideoContainer" style="display:none;padding:0;margin:0">
-        <video style="width:100%;height:100%;border:0px solid blue;padding:0;margin:0" id="remoteVideo" autoplay playsinline muted></video>
+        <video style="width:100%;height:100%;border:1px solid blue;padding:0;margin:0" id="remoteVideo" autoplay
+            playsinline muted></video>
     </div>
-    <div><button id="offer">offer</button></div>
     <script>
         const signalingServerUrl = "ws://localhost:3000"; // サーバーのIPを指定
         const signalingSocket = new WebSocket(signalingServerUrl);
         const peerConnection = new RTCPeerConnection({});
         const dataChannel = peerConnection.createDataChannel("channel");
+        const localVideoContainer = document.getElementById('localVideoContainer');
+        const remoteVideoContainer = document.getElementById('remoteVideoContainer');
+
+        document.getElementById('loacal-btn').onclick = async () => {
+            if (localVideoContainer.style.display === 'none') {
+                localVideoContainer.style.display = 'block';
+            } else {
+                localVideoContainer.style.display = 'none';
+            }
+        }
+
+        document.getElementById('remote-btn').onclick = async () => {
+            if (remoteVideoContainer.style.display === 'none') {
+                remoteVideoContainer.style.display = 'block';
+            } else {
+                remoteVideoContainer.style.display = 'none';
+            }
+        }
 
         signalingSocket.onmessage = async (message) => {
             console.log('メッセージを受信:', message);
@@ -28,7 +48,6 @@
             switch (data.type) {
                 case 'offer': {
                     console.log('オファーを受信:', data);
-                    document.getElementById("remoteVideoContainer").style.display = "block";
                     document.getElementById("offer").remove();
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data))
                     const answer = await peerConnection.createAnswer();
@@ -41,7 +60,6 @@
                 }
                 case 'answer': {
                     console.log('リモートディスクリプションを設定:');
-                    document.getElementById("localVideoContainer").style.display = "block";
                     document.getElementById("offer").remove();
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
                     break;
